@@ -11,16 +11,21 @@ import edu.eckerd.google.api.services.directory.models.Group
 
 import concurrent.{ExecutionContext, Future}
 import language.postfixOps
+import language.implicitConversions
 import scala.collection.parallel.ParSeq
 /**
   * Created by davenpcm on 6/24/16.
   */
 trait GroupsTable {
 
-  def UpdateGoogleGroupsTable(implicit dbConfig: DatabaseConfig[JdbcProfile], service: Directory, ec: ExecutionContext
+  def UpdateGoogleGroupsTable(domain: String)(
+                               implicit dbConfig: DatabaseConfig[JdbcProfile],
+                               service: Directory,
+                               ec: ExecutionContext
                              ): Future[Seq[(Group, Int)]] = {
+
     import dbConfig.driver.api._
-    val db = dbConfig.db
+    val db : JdbcProfile#Backend#Database = dbConfig.db
 
     /**
       * This query takes a googleGroupID and checks it against the GoogleGroups table. This is the primary Key of the
@@ -103,18 +108,47 @@ trait GroupsTable {
       )
     }
 
-
-    val currentGroups: ParSeq[Group] = service.groups.list("eckerd.edu").par
-
-    val UpdatedRows : ParSeq[Future[(Group, Int)]] = for {
-        g <- currentGroups
+    /**
+      * This Function is the aggregate that updates the database. It updates every record with its current status
+      * from google. It gets records from google, and then a corresponding record from both the current table and
+      * gwbalias in order to make the updated record correctly. Finally it runs the insertOrUpdate which utilizes
+      * the Primary Key on this table to Update the record.
+      *
+      * @param currentGroups Curent Google Groups
+      * @return A Future of All Groups and an Int corresponding to Records effected by that group,
+      *         which should always be 1
+      */
+    def UpdateGroupTable( currentGroups: Seq[Group] ): Future[Seq[(Group, Int)]] = {
+      val UpdatedRows : ParSeq[Future[(Group, Int)]] = for {
+        g <- currentGroups.par
       } yield for {
         gr <- db.run(queryGoogleGroupsTableById(g.id.get).result.headOption)
         ar <- db.run(queryGwbAliasByEmail(g.email).result.headOption)
         rowsAffected <- db.run(googleGroups.insertOrUpdate(createGroupsTableRow(g, gr, ar)))
       } yield (g, rowsAffected)
+      Future.sequence(UpdatedRows.seq)
+    }
 
-    Future.sequence(UpdatedRows.seq)
+    /**
+      * This function Deletes All Groups from the Database That Exist in the Database but not in Google. It queries
+      * the database then filters out any record with an id consistent with google.
+      * @param currentGoogleGroups Current Google Groups
+      * @return A Future Sequence of Int
+      */
+    def DeleteNonExistentGroups(currentGoogleGroups: Seq[Group]) : Future[Seq[(GoogleGroupsRow, Int)]] = {
+      val currentGoogleGroupsSet = currentGoogleGroups.map(_.id.get).toSet
+      db.run(googleGroups.result).flatMap { groups =>
+        val newSet = groups.filter( group => !currentGoogleGroupsSet.contains(group.id))
+        Future.traverse(newSet)( group =>  db.run(queryGoogleGroupsTableById(group.id).delete).map(i => (group, i)) )
+      }
+    }
+
+    val currentGroups = service.groups.list("eckerd.edu")
+
+    for {
+      deleted <- DeleteNonExistentGroups(currentGroups)
+      result <- UpdateGroupTable(currentGroups)
+    } yield result
 
   }
 
