@@ -19,6 +19,30 @@ import scala.collection.parallel.ParSeq
 trait GroupsTable {
 
   /**
+    * This is the Primary Interface To Completely Update The Google Groups Table, It knows to go and get
+    * the records from google from the requested domain, and then deletes Groups which do not exist, and then updates
+    * all the existing groups.
+    * @param domain This is the domain to grab from google i.e. "eckerd.edu"
+    * @param dbConfig This is a database configuration so we know where to write and remove information from
+    * @param service The Google Directory Service that can go and get the Users
+    * @param ec The Execution context So that we can split threads appropriately for the futures
+    * @return A Sequence of Tuples with The Group and the Number of Rows Affected
+    */
+  def UpdateGoogleGroupsTableComplete(domain: String)(
+    implicit dbConfig: DatabaseConfig[JdbcProfile],
+    service: Directory,
+    ec: ExecutionContext
+  ): Future[Seq[(Group, Int)]] = {
+
+    val currentGroups = service.groups.list(domain)
+    for {
+      deleted <- DeleteNonExistentGroups(currentGroups)
+      result <- UpdateGroupTable(currentGroups)
+    } yield result
+
+  }
+
+  /**
     * This query takes a googleGroupID and checks it against the GoogleGroups table. This is the primary Key of the
     * table so while it returns a Sequence there will only ever be a single value if it exists
     *
@@ -105,45 +129,29 @@ trait GroupsTable {
     )
   }
 
-  def UpdateGoogleGroupsTable(domain: String)(
-                               implicit dbConfig: DatabaseConfig[JdbcProfile],
-                               service: Directory,
-                               ec: ExecutionContext
-                             ): Future[Seq[(Group, Int)]] = {
-
+  /**
+    * This Function is the aggregate that updates the database. It updates every record with its current status
+    * from google. It gets records from google, and then a corresponding record from both the current table and
+    * gwbalias in order to make the updated record correctly. Finally it runs the insertOrUpdate which utilizes
+    * the Primary Key on this table to Update the record.
+    *
+    * @param currentGroups Curent Google Groups
+    * @return A Future of All Groups and an Int corresponding to Records effected by that group,
+    *         which should always be 1
+    */
+  def UpdateGroupTable( currentGroups: Seq[Group] )(
+    implicit dbConfig: DatabaseConfig[JdbcProfile], ec: ExecutionContext): Future[Seq[(Group, Int)]] = {
     import dbConfig.driver.api._
     val db : JdbcProfile#Backend#Database = dbConfig.db
 
-    /**
-      * This Function is the aggregate that updates the database. It updates every record with its current status
-      * from google. It gets records from google, and then a corresponding record from both the current table and
-      * gwbalias in order to make the updated record correctly. Finally it runs the insertOrUpdate which utilizes
-      * the Primary Key on this table to Update the record.
-      *
-      * @param currentGroups Curent Google Groups
-      * @return A Future of All Groups and an Int corresponding to Records effected by that group,
-      *         which should always be 1
-      */
-    def UpdateGroupTable( currentGroups: Seq[Group] ): Future[Seq[(Group, Int)]] = {
-      val UpdatedRows : ParSeq[Future[(Group, Int)]] = for {
-        g <- currentGroups.par
-      } yield for {
-        gr <- db.run(queryGoogleGroupsTableById(g.id.get).result.headOption)
-        ar <- db.run(queryGwbAliasByEmail(g.email).result.headOption)
-        rowsAffected <- db.run(googleGroups.insertOrUpdate(createGroupsTableRow(g, gr, ar)))
-      } yield (g, rowsAffected)
-      Future.sequence(UpdatedRows.seq)
-    }
-
-
-
-    val currentGroups = service.groups.list("eckerd.edu")
-
-    for {
-      deleted <- DeleteNonExistentGroups(currentGroups)
-      result <- UpdateGroupTable(currentGroups)
-    } yield result
-
+    val UpdatedRows : ParSeq[Future[(Group, Int)]] = for {
+      g <- currentGroups.par
+    } yield for {
+      gr <- db.run(queryGoogleGroupsTableById(g.id.get).result.headOption)
+      ar <- db.run(queryGwbAliasByEmail(g.email).result.headOption)
+      rowsAffected <- db.run(googleGroups.insertOrUpdate(createGroupsTableRow(g, gr, ar)))
+    } yield (g, rowsAffected)
+    Future.sequence(UpdatedRows.seq)
   }
 
   /**
@@ -169,7 +177,12 @@ trait GroupsTable {
     }
   }
 
-
+  /**
+    * This is the function the can create the google Groups Table.
+    * @param dbConfig The Database to Create The Table In
+    * @param ec The Execution Context to split into the Future
+    * @return A Future of Unit
+    */
   def createGoogleGroupsTable(implicit dbConfig: DatabaseConfig[JdbcProfile], ec: ExecutionContext): Future[Unit] = {
     import dbConfig.driver.api._
     val db = dbConfig.db
@@ -179,6 +192,12 @@ trait GroupsTable {
     db.run(action)
   }
 
+  /**
+    * This Drops the Google Groups Table. Hopefully this won't need to be used.
+    * @param dbConfig Where to get rid of this Table from
+    * @param ec An Execution Context to Split Into the Future
+    * @return A Future of Unit
+    */
   def dropGoogleGroupsTable(implicit dbConfig: DatabaseConfig[JdbcProfile], ec: ExecutionContext): Future[Unit] = {
     import dbConfig.driver.api._
     val db = dbConfig.db
