@@ -1,5 +1,6 @@
 package edu.eckerd.scripts.google.methods
 
+import com.typesafe.scalalogging.LazyLogging
 import edu.eckerd.google.api.services.directory.Directory
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
@@ -8,6 +9,7 @@ import edu.eckerd.scripts.google.temp.GoogleTables.GoogleGroupsRow
 import edu.eckerd.scripts.google.temp.GoogleTables.gwbAlias
 import edu.eckerd.scripts.google.temp.GoogleTables.GwbaliasRow
 import edu.eckerd.google.api.services.directory.models.Group
+
 import concurrent.{ExecutionContext, Future}
 import language.postfixOps
 import language.implicitConversions
@@ -16,25 +18,30 @@ import scala.collection.parallel.ParSeq
 /**
   * Created by davenpcm on 6/24/16.
   */
-object GroupsTable {
+object GroupsTable extends LazyLogging{
 
   /**
     * This is the Primary Interface To Completely Update The Google Groups Table, It knows to go and get
     * the records from google from the requested domain, and then deletes Groups which do not exist, and then updates
     * all the existing groups.
-    * @param domain This is the domain to grab from google i.e. "eckerd.edu"
+    *
+    * @param domains These are the domains to grab from google i.e. "eckerd.edu"
     * @param dbConfig This is a database configuration so we know where to write and remove information from
     * @param service The Google Directory Service that can go and get the Users
     * @param ec The Execution context So that we can split threads appropriately for the futures
     * @return A Sequence of Tuples with The Group and the Number of Rows Affected
     */
-  def UpdateGoogleGroupsTableComplete(domain: String)(
+  def UpdateGoogleGroupsTableComplete(domains: Seq[String])(
     implicit dbConfig: DatabaseConfig[JdbcProfile],
     service: Directory,
     ec: ExecutionContext
   ): Future[Seq[(Group, Int)]] = {
 
-    val currentGroups = service.groups.list(domain)
+    val currentGroups = for {
+      domain <- domains
+      result <- service.groups.list(domain)
+    } yield result
+
     for {
       deleted <- DeleteNonExistentGroups(currentGroups)
       result <- UpdateGroupTable(currentGroups)
@@ -152,7 +159,10 @@ object GroupsTable {
       gr <- db.run(queryGoogleGroupsTableById(g.id.get).result.headOption)
       ar <- db.run(queryGwbAliasByEmail(g.email).result.headOption)
       rowsAffected <- db.run(googleGroups.insertOrUpdate(createGroupsTableRow(g, gr, ar)))
-    } yield (g, rowsAffected)
+    } yield {
+      logger.debug(s"Updated Group ${createGroupsTableRow(g, gr, ar)}")
+      (g, rowsAffected)
+    }
     Future.sequence(UpdatedRows.seq)
   }
 
@@ -175,9 +185,10 @@ object GroupsTable {
     db.run(googleGroups.result).flatMap { groups =>
       Future.sequence{
         groups.withFilter(group => !currentGoogleGroupsSet.contains(group.id))
-          .map(group =>
+          .map { group =>
+            logger.debug(s"Deleting Group From DB - $group")
             db.run(queryGoogleGroupsTableById(group.id).delete).map((group, _))
-          )
+          }
       }
     }
   }
@@ -200,6 +211,7 @@ object GroupsTable {
 
   /**
     * This Drops the Google Groups Table. Hopefully this won't need to be used.
+    *
     * @param dbConfig Where to get rid of this Table from
     * @param ec An Execution Context to Split Into the Future
     * @return A Future of Unit

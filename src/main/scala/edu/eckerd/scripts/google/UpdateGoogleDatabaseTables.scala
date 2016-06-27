@@ -1,9 +1,11 @@
 package edu.eckerd.scripts.google
 
+import com.typesafe.scalalogging.LazyLogging
 import edu.eckerd.google.api.services.directory.Directory
 import edu.eckerd.scripts.google.temp.GoogleTables
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
+
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -21,21 +23,24 @@ import edu.eckerd.scripts.google.methods.UsersTable._
   * On Compile Make Sure You have a .lib folder that contains ojdbc_.jar in this case I am using 7.
   *
   */
-object UpdateGoogleDatabaseTables extends App with GoogleTables {
+object UpdateGoogleDatabaseTables extends App with GoogleTables with LazyLogging {
   implicit val dbConfig: DatabaseConfig[JdbcProfile] = DatabaseConfig.forConfig("oracle")
   implicit val profile = dbConfig.driver
   implicit val directory = Directory()
-  val domain = "eckerd.edu"
+  val domains = Seq("eckerd.edu", "test.eckerd.edu")
 
   val doIt = for {
-    createUsers <- createGoogleUsersTable
-    usersUpdate <- updateGoogleUsersTable(domain)
-    createGroups <- createGoogleGroupsTable
-    groupsUpdate <- UpdateGoogleGroupsTableComplete(domain)
-    createGroupToUser <- createGoogleGroupToUserTable
-    groupToUserUpdate <- UpdateGoogleGroupToUserTable(domain)
+//    createUsers <- createGoogleUsersTable
+    usersUpdate <- updateGoogleUsersTable(domains)
+//    createGroups <- createGoogleGroupsTable
+    groupsUpdate <- UpdateGoogleGroupsTableComplete(domains)
+//    createGroupToUser <- createGoogleGroupToUserTable
+    groupToUserUpdate <- UpdateGoogleGroupToUserTable(domains)
   } yield (usersUpdate, groupsUpdate, groupToUserUpdate)
 
   val result = Await.result(doIt, Duration.Inf)
 
+  result._1.foreach(results => logger.debug(s"Complete: User - ${results._1} - ${results._2}"))
+  result._2.foreach(results => logger.debug(s"Complete: Group - ${results._1} - ${results._2}"))
+  result._3.foreach(results => logger.debug(s"Complete: GroupToUser - ${results._1} - ${results._2}"))
 }

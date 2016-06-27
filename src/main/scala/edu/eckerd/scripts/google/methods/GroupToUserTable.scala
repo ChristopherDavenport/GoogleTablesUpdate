@@ -1,48 +1,81 @@
 package edu.eckerd.scripts.google.methods
 
+import com.sun.net.httpserver.Authenticator.Success
+import com.typesafe.scalalogging.LazyLogging
 import edu.eckerd.scripts.google.temp.GoogleTables.googleGroupToUser
 import edu.eckerd.scripts.google.temp.GoogleTables.GoogleGroupToUserRow
 import edu.eckerd.scripts.google.temp.GoogleTables.googleGroupToUserByPK
 import edu.eckerd.google.api.services.directory.Directory
+import edu.eckerd.google.api.services.directory.models.Member
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
+
 import concurrent.{ExecutionContext, Future}
 import language.postfixOps
 import language.implicitConversions
+import scala.util.Try
+import scala.util.control.NonFatal
 
 /**
   * Created by davenpcm on 6/26/16.
   */
-object GroupToUserTable {
+object GroupToUserTable extends LazyLogging{
 
 
 
   /**
     * This updates the Google Group To User Table for a given domain
-    * @param domain The domain to retreive from Google
+    * @param domains The domains to retreive from Google
     * @param dbConfig The database configuration to Update the Table In
     * @param service The Google Directory to Retreive Users and Members From
     * @param ec The Execution Context To Split Into For Futures
     * @return A Sequence of Each Row and the Number of Rows Effected, which Should always be 1
     */
-  def UpdateGoogleGroupToUserTable(domain: String)(
+  def UpdateGoogleGroupToUserTable(domains: Seq[String])(
     implicit dbConfig: DatabaseConfig[JdbcProfile],
     service: Directory,
     ec: ExecutionContext
-  ): Future[Seq[(GoogleGroupToUserRow, Int)]] = {
+  ): Future[Seq[(Member, Int)]] = {
 
     Future.sequence{
-      for {
+      val perform = for {
+        domain <- domains.par
         group <- service.groups.list(domain)
-        member <- service.members.list(group.email)
+        member <- service.members.list(group.email).par
       } yield {
         val GeneratedRow = GoogleGroupToUserRow(group.id.get, member.id.get, "N", member.role, member.memberType)
         for {
-          rowFromDB <- getMemberFromDB(GeneratedRow) if rowFromDB.isEmpty
-          result <- addMemberToDB(GeneratedRow)
-        } yield (GeneratedRow, result)
+          rowFromDB <- getMemberFromDB(group.id.get, member.id.get)
+          result <- insertOrUpdateMemberInDB(rowFromDB, GeneratedRow)
+        } yield {
+          logger.debug(s"Row From DB For $member - $rowFromDB")
+          (member, result)
+        }
       }
+      perform.seq
     }
+  }
+
+  private def insertOrUpdateMemberInDB(existingRow: Option[GoogleGroupToUserRow], generatedRow: GoogleGroupToUserRow)
+                                      (implicit dbConfig: DatabaseConfig[JdbcProfile],
+                                       ec: ExecutionContext): Future[Int] = existingRow match {
+//    case Some(row) =>
+//      val updatedRow = GoogleGroupToUserRow(
+//        generatedRow.groupId,
+//        generatedRow.userID,
+//        row.autoIndicator,
+//        generatedRow.memberRole,
+//        generatedRow.memberType,
+//        row.processIndicator
+//      )
+//      if (){
+//        Future.successful(0)
+//      } else {
+//        updateMemberInDB(updatedRow)
+//      }
+    case None =>
+      addMemberToDB(generatedRow)
+    case _ => Future.successful(0)
   }
 
   /**
@@ -58,9 +91,12 @@ object GroupToUserTable {
     import dbConfig.driver.api._
     val db : JdbcProfile#Backend#Database = dbConfig.db
 
+    logger.debug(s"Updated Member In DB - $member")
     db.run(
-      googleGroupToUserByPK(member.groupId, member.userID).update(member)
-    )
+        googleGroupToUserByPK(member.groupId, member.userID).update(member)
+    ) recoverWith {
+      case e: Exception => Future.successful(0)
+    }
   }
 
 
@@ -77,7 +113,11 @@ object GroupToUserTable {
     import dbConfig.driver.api._
     val db : JdbcProfile#Backend#Database = dbConfig.db
 
-    db.run(googleGroupToUser += member)
+    logger.debug(s"Adding Member To DB - $member")
+
+    db.run(googleGroupToUser += member) recoverWith {
+      case e: Exception => Future.successful(0)
+    }
   }
 
   /**

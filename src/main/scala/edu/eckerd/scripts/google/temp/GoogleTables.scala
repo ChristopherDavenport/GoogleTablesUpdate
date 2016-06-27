@@ -23,7 +23,7 @@ trait GoogleTables {
   val profile : slick.driver.JdbcProfile
   import profile.api._
 
-  lazy val schema: profile.SchemaDescription = googleUsers.schema ++ googleGroups.schema ++ googleGroupToUser.schema
+  lazy val schema = googleUsers.schema ++ googleGroups.schema ++ googleGroupToUser.schema
 
   class GOOGLE_USERS(tag: Tag)  extends Table[User](tag, "GOOGLE_USERS") {
     def googleID = column[String]("GOOGLE_ID", O.PrimaryKey)
@@ -135,7 +135,7 @@ trait GoogleTables {
     def autoKey = column[Option[String]]("AUTO_KEY")
     def autoTermCode = column[Option[String]]("AUTO_TERM_CODE")
 
-    def pk = index("GROUP_MASTER_PK", (id, autoType, autoKey), unique = true)
+    def pk = index("GROUP_GROUPS_PK", (id, autoType, autoKey), unique = true)
 
     def * = (id, autoIndicator , name, email, count, desc, processIndicator, autoType, autoKey, autoTermCode) <>
       (GoogleGroupsRow.tupled, GoogleGroupsRow.unapply)
@@ -160,7 +160,7 @@ trait GoogleTables {
     def memberType = column[String]("MEMBER_TYPE")
     def processIndicator = column[Option[String]]("PROCESS_INDICATOR")
 
-    def pk = index("GROUPTOIDENT_PK", (groupId, userID), unique = true)
+    def pk = index("GOOGLE_GROUP_TO_USER_PK", (groupId, userID), unique = true)
     def user = foreignKey("USER_FK", userID, googleUsers)( _.googleID,
       onUpdate = ForeignKeyAction.Restrict, onDelete = ForeignKeyAction.Cascade
     )

@@ -1,35 +1,31 @@
 package edu.eckerd.scripts.google.methods
 
-import java.sql.SQLSyntaxErrorException
-
+import com.typesafe.scalalogging.LazyLogging
 import edu.eckerd.google.api.services.directory.Directory
-import edu.eckerd.google.api.services.directory.models.User
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 import edu.eckerd.scripts.google.temp.GoogleTables.googleUsers
-
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
-
+import edu.eckerd.google.api.services.directory.models.User
 /**
   * Created by davenpcm on 6/24/16.
   */
-object UsersTable {
+object UsersTable extends LazyLogging {
 
-  def updateGoogleUsersTable(domain: String)(implicit dbConfig: DatabaseConfig[JdbcProfile], directory: Directory, ec : ExecutionContext):
-  Future[List[Int]] = {
+  def updateGoogleUsersTable(domains: Seq[String])(implicit dbConfig: DatabaseConfig[JdbcProfile], directory: Directory, ec : ExecutionContext):
+  Future[Seq[(User,Int)]] = {
 
     import dbConfig.driver.api._
     val db = dbConfig.db
 
     val UpdateUsersTable = for {
+      domain <- domains
       user <- directory.users.list(domain)
     } yield for {
       result <- db.run(googleUsers.insertOrUpdate(user))
-    } yield result
+    } yield (user, result)
 
     Future.sequence(UpdateUsersTable)
-
   }
 
   def createGoogleUsersTable(implicit dbConfig: DatabaseConfig[JdbcProfile], ec: ExecutionContext): Future[Unit] = {
@@ -40,6 +36,8 @@ object UsersTable {
     val action = tableQuery.schema.create
     db.run(action)
   }
+
+
 
   def dropGoogleUsersTable(implicit dbConfig: DatabaseConfig[JdbcProfile], ec: ExecutionContext): Future[Unit] = {
     import dbConfig.driver.api._
