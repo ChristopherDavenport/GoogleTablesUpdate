@@ -119,7 +119,7 @@ trait GroupToUserTable {
     * @param ec The Execution Context to split into the Future
     * @return A Future of Unit
     */
-  def createGoogleGroupsTable(implicit dbConfig: DatabaseConfig[JdbcProfile], ec: ExecutionContext): Future[Unit] = {
+  def createGoogleGroupToUserTable(implicit dbConfig: DatabaseConfig[JdbcProfile], ec: ExecutionContext): Future[Unit] = {
     import dbConfig.driver.api._
     val db = dbConfig.db
 
@@ -133,7 +133,7 @@ trait GroupToUserTable {
     * @param ec An Execution Context to Split Into the Future
     * @return A Future of Unit
     */
-  def dropGoogleGroupsTable(implicit dbConfig: DatabaseConfig[JdbcProfile], ec: ExecutionContext): Future[Unit] = {
+  def dropGoogleGroupToUserTable(implicit dbConfig: DatabaseConfig[JdbcProfile], ec: ExecutionContext): Future[Unit] = {
     import dbConfig.driver.api._
     val db = dbConfig.db
 
