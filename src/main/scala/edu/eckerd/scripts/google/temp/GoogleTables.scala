@@ -19,7 +19,6 @@ trait GoogleTables {
 
   class GOOGLE_USERS(tag: Tag)  extends Table[User](tag, "GOOGLE_USERS") {
     def googleID = column[String]("GOOGLE_ID", O.PrimaryKey)
-
     def firstName = column[String]("FIRST_NAME")
     def lastName = column[String]("LAST_NAME")
     def email = column[String]("EMAIL")

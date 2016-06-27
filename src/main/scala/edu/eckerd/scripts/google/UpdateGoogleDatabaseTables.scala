@@ -12,6 +12,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * Created by davenpcm on 6/24/16.
+  * This is a simple script for the maintenance of a set of Google Tables that correspond to your existing Google
+  * Users and Groups. The commented lines are for first run to generate th necessary tables.
+  *
+  * If you are having errors they are likely related to your application.conf or the presence of the Oracle JDBC jar.
+  * On Compile Make Sure You have a .lib folder that contains ojdbc_.jar in this case I am using 7.
+  *
   */
 object UpdateGoogleDatabaseTables extends App with GoogleTables with  GroupsTable with UsersTable with GroupToUserTable{
   implicit val dbConfig: DatabaseConfig[JdbcProfile] = DatabaseConfig.forConfig("oracle")
@@ -19,11 +25,11 @@ object UpdateGoogleDatabaseTables extends App with GoogleTables with  GroupsTabl
   implicit val directory = Directory()
 
   val doIt = for {
-    createUsers <- createGoogleUsersTable
+//    createUsers <- createGoogleUsersTable
     usersUpdate <- updateGoogleUsersTable
-    createGroups <- createGoogleGroupsTable
+//    createGroups <- createGoogleGroupsTable
     groupsUpdate <- UpdateGoogleGroupsTableComplete("eckerd.edu")
-    createGroupToUser <- createGoogleGroupToUserTable
+//    createGroupToUser <- createGoogleGroupToUserTable
     groupToUserUpdate <- UpdateGoogleGroupToUserTable("eckerd.edu")
   } yield (usersUpdate, groupsUpdate, groupToUserUpdate)
 
