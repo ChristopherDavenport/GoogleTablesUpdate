@@ -1,5 +1,7 @@
 package edu.eckerd.scripts.google.methods
 
+import java.sql.SQLSyntaxErrorException
+
 import com.sun.net.httpserver.Authenticator.Success
 import com.typesafe.scalalogging.LazyLogging
 import edu.eckerd.scripts.google.temp.GoogleTables.googleGroupToUser
@@ -116,7 +118,15 @@ object GroupToUserTable extends LazyLogging{
     logger.debug(s"Adding Member To DB - $member")
 
     db.run(googleGroupToUser += member) recoverWith {
-      case e: Exception => Future.successful(0)
+      case sqlErr: SQLSyntaxErrorException =>
+        logger.error(s"SQL Syntax Error - ${sqlErr.getLocalizedMessage}")
+        Future.successful(0)
+      case sqlIntegrityConstraint =>
+        logger.error(s"SQL Syntax Error With - $member ${sqlIntegrityConstraint.getMessage.takeWhile(_ != '\n')}")
+        Future.successful(0)
+      case e: Exception =>
+        logger.error(s"Error Encountered With - $member", e)
+        Future.successful(0)
     }
   }
 
