@@ -16,7 +16,7 @@ import scala.collection.parallel.ParSeq
 /**
   * Created by davenpcm on 6/24/16.
   */
-trait GroupsTable {
+object GroupsTable {
 
   /**
     * This is the Primary Interface To Completely Update The Google Groups Table, It knows to go and get

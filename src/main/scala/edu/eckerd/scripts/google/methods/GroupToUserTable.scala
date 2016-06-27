@@ -2,6 +2,7 @@ package edu.eckerd.scripts.google.methods
 
 import edu.eckerd.scripts.google.temp.GoogleTables.googleGroupToUser
 import edu.eckerd.scripts.google.temp.GoogleTables.GoogleGroupToUserRow
+import edu.eckerd.scripts.google.temp.GoogleTables.googleGroupToUserByPK
 import edu.eckerd.google.api.services.directory.Directory
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
@@ -12,7 +13,9 @@ import language.implicitConversions
 /**
   * Created by davenpcm on 6/26/16.
   */
-trait GroupToUserTable {
+object GroupToUserTable {
+
+
 
   /**
     * This updates the Google Group To User Table for a given domain
@@ -55,12 +58,12 @@ trait GroupToUserTable {
     import dbConfig.driver.api._
     val db : JdbcProfile#Backend#Database = dbConfig.db
 
-    val r = for {
-      rec <- googleGroupToUser if rec.groupId === member.groupId && rec.userID === member.userID
-    } yield rec
-
-    db.run(r.update(member))
+    db.run(
+      googleGroupToUserByPK(member.groupId, member.userID).update(member)
+    )
   }
+
+
 
   /**
     * This adds a new member to the database.
@@ -106,9 +109,7 @@ trait GroupToUserTable {
     val db : JdbcProfile#Backend#Database = dbConfig.db
 
     db.run(
-      googleGroupToUser.withFilter(rec =>
-        rec.groupId === groupId && rec.userID === memberId
-      ).result.headOption
+      googleGroupToUserByPK(groupId, memberId).result.headOption
     )
   }
 

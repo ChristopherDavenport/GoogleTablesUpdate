@@ -7,15 +7,23 @@ import edu.eckerd.google.api.services.directory.models.{Email, Name, User}
 /**
   * Created by davenpcm on 6/24/16.
   */
-object GoogleTables extends {
+object GoogleTables extends GoogleTables {
   val profile = com.typesafe.slick.driver.oracle.OracleDriver
-} with GoogleTables
+  import profile.api._
+
+  private def googleGroupToUserFindByPK(groupID: Rep[String], userID: Rep[String]) = for {
+    gtu <- googleGroupToUser if gtu.groupId === groupID && gtu.userID === userID
+  } yield gtu
+
+  val googleGroupToUserByPK = Compiled(googleGroupToUserFindByPK _)
+
+}
 
 trait GoogleTables {
   val profile : slick.driver.JdbcProfile
   import profile.api._
 
-  lazy val schema: profile.SchemaDescription = googleUsers.schema ++ googleGroups.schema
+  lazy val schema: profile.SchemaDescription = googleUsers.schema ++ googleGroups.schema ++ googleGroupToUser.schema
 
   class GOOGLE_USERS(tag: Tag)  extends Table[User](tag, "GOOGLE_USERS") {
     def googleID = column[String]("GOOGLE_ID", O.PrimaryKey)
@@ -165,6 +173,7 @@ trait GoogleTables {
   }
 
   lazy val googleGroupToUser = new TableQuery(tag => new GOOGLE_GROUP_TO_USER(tag))
+
 
   case class GwbaliasRow(
                          typePkCk: String,

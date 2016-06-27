@@ -14,21 +14,22 @@ import scala.util.{Failure, Success, Try}
 /**
   * Created by davenpcm on 6/24/16.
   */
-trait UsersTable {
+object UsersTable {
 
-  def updateGoogleUsersTable(implicit dbConfig: DatabaseConfig[JdbcProfile], directory: Directory, ec : ExecutionContext):
+  def updateGoogleUsersTable(domain: String)(implicit dbConfig: DatabaseConfig[JdbcProfile], directory: Directory, ec : ExecutionContext):
   Future[List[Int]] = {
 
     import dbConfig.driver.api._
     val db = dbConfig.db
 
     val UpdateUsersTable = for {
-      user <- directory.users.list("test.eckerd.edu") ::: directory.users.list()
+      user <- directory.users.list(domain)
     } yield for {
       result <- db.run(googleUsers.insertOrUpdate(user))
     } yield result
 
     Future.sequence(UpdateUsersTable)
+
   }
 
   def createGoogleUsersTable(implicit dbConfig: DatabaseConfig[JdbcProfile], ec: ExecutionContext): Future[Unit] = {
