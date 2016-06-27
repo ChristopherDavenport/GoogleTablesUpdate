@@ -8,11 +8,11 @@ import edu.eckerd.scripts.google.temp.GoogleTables.GoogleGroupsRow
 import edu.eckerd.scripts.google.temp.GoogleTables.gwbAlias
 import edu.eckerd.scripts.google.temp.GoogleTables.GwbaliasRow
 import edu.eckerd.google.api.services.directory.models.Group
-
 import concurrent.{ExecutionContext, Future}
 import language.postfixOps
 import language.implicitConversions
 import scala.collection.parallel.ParSeq
+
 /**
   * Created by davenpcm on 6/24/16.
   */
@@ -135,7 +135,9 @@ trait GroupsTable {
     * gwbalias in order to make the updated record correctly. Finally it runs the insertOrUpdate which utilizes
     * the Primary Key on this table to Update the record.
     *
-    * @param currentGroups Curent Google Groups
+    * @param currentGroups Current Google Groups
+    * @param dbConfig The Database to Update
+    * @param ec The Execution Context To Take Threads From
     * @return A Future of All Groups and an Int corresponding to Records effected by that group,
     *         which should always be 1
     */
@@ -157,7 +159,10 @@ trait GroupsTable {
   /**
     * This function Deletes All Groups from the Database That Exist in the Database but not in Google. It queries
     * the database then filters out any record with an id consistent with google.
+    *
     * @param currentGoogleGroups Current Google Groups
+    * @param dbConfig Database to Delete From
+    * @param ec The execution context to take threads from.
     * @return A Future Sequence of Int
     */
   def DeleteNonExistentGroups(currentGoogleGroups: Seq[Group])
@@ -179,6 +184,7 @@ trait GroupsTable {
 
   /**
     * This is the function the can create the google Groups Table.
+    *
     * @param dbConfig The Database to Create The Table In
     * @param ec The Execution Context to split into the Future
     * @return A Future of Unit
