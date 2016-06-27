@@ -122,7 +122,7 @@ object GroupToUserTable extends LazyLogging{
         logger.error(s"SQL Syntax Error - ${sqlErr.getLocalizedMessage}")
         Future.successful(0)
       case sqlIntegrityConstraint =>
-        logger.error(s"SQL Syntax Error With - $member ${sqlIntegrityConstraint.getMessage.takeWhile(_ != '\n')}")
+        logger.error(s"$member - ${sqlIntegrityConstraint.getMessage.takeWhile(_ != '\n')}")
         Future.successful(0)
       case e: Exception =>
         logger.error(s"Error Encountered With - $member", e)
