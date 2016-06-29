@@ -24,6 +24,7 @@ import edu.eckerd.scripts.google.methods.UsersTable._
   *
   */
 object UpdateGoogleDatabaseTables extends App with GoogleTables with LazyLogging {
+  logger.info("Starting Update of Google Tables")
   implicit val dbConfig: DatabaseConfig[JdbcProfile] = DatabaseConfig.forConfig("oracle")
   implicit val profile = dbConfig.driver
   implicit val directory = Directory()
@@ -43,4 +44,5 @@ object UpdateGoogleDatabaseTables extends App with GoogleTables with LazyLogging
   result._1.foreach(results => logger.debug(s"Complete: User - ${results._1} - ${results._2}"))
   result._2.foreach(results => logger.debug(s"Complete: Group - ${results._1} - ${results._2}"))
   result._3.foreach(results => logger.debug(s"Complete: GroupToUser - ${results._1} - ${results._2}"))
+  logger.info("Update of Google Tables Complete")
 }
