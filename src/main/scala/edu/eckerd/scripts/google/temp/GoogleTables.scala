@@ -17,7 +17,7 @@ object GoogleTables extends GoogleTables with LazyLogging{
   def recoverFromTableCreateFail: PartialFunction[Throwable, Future[Unit]] = {
     case tableExists : SQLSyntaxErrorException if
     tableExists.getLocalizedMessage.contains("ORA-00955: name is already used by an existing object") =>
-      logger.warn("Table Already Exists, if this is first run - TableNames may already be in use")
+      logger.debug("Table Already Exists, if this is first run - TableNames may already be in use")
       Future.successful(())
   }
 

@@ -28,7 +28,7 @@ object UpdateGoogleDatabaseTables extends App with GoogleTables with LazyLogging
   implicit val dbConfig: DatabaseConfig[JdbcProfile] = DatabaseConfig.forConfig("oracle")
   implicit val profile = dbConfig.driver
   implicit val directory = Directory()
-  val domains = Seq("eckerd.edu")
+  val domains = Seq("eckerd.edu", "test.eckerd.edu")
 
   val doIt = for {
     createUsers <- createGoogleUsersTable

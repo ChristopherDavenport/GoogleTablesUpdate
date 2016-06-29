@@ -40,6 +40,8 @@ object GroupToUserTable extends LazyLogging{
     ec: ExecutionContext
   ): Future[Seq[(Member, Int)]] = {
 
+    logger.info("Starting Google Members Update")
+
     Future.sequence{
       val perform = for {
         domain <- domains.par
@@ -174,7 +176,7 @@ object GroupToUserTable extends LazyLogging{
   def createGoogleGroupToUserTable(implicit dbConfig: DatabaseConfig[JdbcProfile], ec: ExecutionContext): Future[Unit] = {
     import dbConfig.driver.api._
     val db = dbConfig.db
-
+    logger.info("Attempting to Create Google Members Table")
     val action = googleGroupToUser.schema.create
     db.run(action) recoverWith recoverFromTableCreateFail
   }

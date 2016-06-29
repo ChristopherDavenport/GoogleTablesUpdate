@@ -37,6 +37,8 @@ object GroupsTable extends LazyLogging{
     ec: ExecutionContext
   ): Future[Seq[(Group, Int)]] = {
 
+    logger.info("Starting Google Groups Update")
+
     val currentGroups = for {
       domain <- domains
       result <- service.groups.list(domain)
@@ -204,7 +206,7 @@ object GroupsTable extends LazyLogging{
     import dbConfig.driver.api._
     val db = dbConfig.db
     val tableQuery = googleGroups
-
+    logger.info("Attempting to Create Google Groups Table")
     val action = tableQuery.schema.create
     db.run(action) recoverWith recoverFromTableCreateFail
   }

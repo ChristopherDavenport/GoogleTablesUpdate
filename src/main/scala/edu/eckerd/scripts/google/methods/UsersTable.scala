@@ -18,6 +18,7 @@ object UsersTable extends LazyLogging {
 
     import dbConfig.driver.api._
     val db = dbConfig.db
+    logger.info("Starting Users Table Update")
 
     val UpdateUsersTable = for {
       domain <- domains
@@ -33,6 +34,8 @@ object UsersTable extends LazyLogging {
     import dbConfig.driver.api._
     val db = dbConfig.db
     val tableQuery = googleUsers
+
+    logger.info("Attempting to Create Google Users Table")
 
     val action = tableQuery.schema.create
     db.run(action) recoverWith recoverFromTableCreateFail
