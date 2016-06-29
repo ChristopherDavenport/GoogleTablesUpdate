@@ -146,33 +146,32 @@ trait GoogleTables {
   case class GoogleGroupToUserRow(
                                     groupId: String,
                                     userID: String,
+                                    userEmail: Option[String],
                                     autoIndicator: String,
                                     memberRole: String,
                                     memberType: String,
                                     processIndicator: Option[String] = None
                                   )
 
-  class GOOGLE_GROUP_TO_USER(tag: Tag) extends Table[GoogleGroupToUserRow](tag, "GOOGLE_GROUP_TO_USER") {
+  class GOOGLE_MEMBERS(tag: Tag) extends Table[GoogleGroupToUserRow](tag, "GOOGLE_MEMBERS") {
     def groupId = column[String]("GROUP_ID")
     def userID = column[String]("USER_ID")
+    def userEmail = column[Option[String]]("USER_EMAIL")
     def autoIndicator = column[String]("AUTO_INDICATOR")
     def memberRole = column[String]("MEMBER_ROLE")
     def memberType = column[String]("MEMBER_TYPE")
     def processIndicator = column[Option[String]]("PROCESS_INDICATOR")
 
     def pk = index("GOOGLE_GROUP_TO_USER_PK", (groupId, userID), unique = true)
-    def user = foreignKey("USER_FK", userID, googleUsers)( _.googleID,
-      onUpdate = ForeignKeyAction.Restrict, onDelete = ForeignKeyAction.Cascade
-    )
     def group = foreignKey("GROUP_FK", groupId, googleGroups)(_.id ,
       onUpdate = ForeignKeyAction.Restrict, onDelete = ForeignKeyAction.Cascade
     )
 
-    def * = (groupId, userID, autoIndicator, memberRole, memberType, processIndicator) <>
+    def * = (groupId, userID, userEmail, autoIndicator, memberRole, memberType, processIndicator) <>
       (GoogleGroupToUserRow.tupled, GoogleGroupToUserRow.unapply )
   }
 
-  lazy val googleGroupToUser = new TableQuery(tag => new GOOGLE_GROUP_TO_USER(tag))
+  lazy val googleGroupToUser = new TableQuery(tag => new GOOGLE_MEMBERS(tag))
 
 
   case class GwbaliasRow(

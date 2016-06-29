@@ -1,6 +1,6 @@
 package edu.eckerd.scripts.google.methods
 
-import java.sql.SQLSyntaxErrorException
+import java.sql.{SQLIntegrityConstraintViolationException, SQLSyntaxErrorException}
 
 import com.sun.net.httpserver.Authenticator.Success
 import com.typesafe.scalalogging.LazyLogging
@@ -45,7 +45,7 @@ object GroupToUserTable extends LazyLogging{
         group <- service.groups.list(domain)
         member <- service.members.list(group.email).par
       } yield {
-        val GeneratedRow = GoogleGroupToUserRow(group.id.get, member.id.get, "N", member.role, member.memberType)
+        val GeneratedRow = GoogleGroupToUserRow(group.id.get, member.id.get, member.email, "N", member.role, member.memberType)
         for {
           rowFromDB <- getMemberFromDB(group.id.get, member.id.get)
           result <- insertOrUpdateMemberInDB(rowFromDB, GeneratedRow)
@@ -121,7 +121,7 @@ object GroupToUserTable extends LazyLogging{
       case sqlErr: SQLSyntaxErrorException =>
         logger.error(s"SQL Syntax Error - ${sqlErr.getLocalizedMessage}")
         Future.successful(0)
-      case sqlIntegrityConstraint =>
+      case sqlIntegrityConstraint : SQLIntegrityConstraintViolationException =>
         logger.error(s"$member - ${sqlIntegrityConstraint.getMessage.takeWhile(_ != '\n')}")
         Future.successful(0)
       case e: Exception =>

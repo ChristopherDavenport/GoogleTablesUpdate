@@ -22,15 +22,15 @@
     </appender>
 
 
-    <logger name="slick.backend.DatabaseComponent.action" level="info"/>
-    <logger name="slick.jdbc" level="info" />
+    <logger name="slick.backend.DatabaseComponent.action" level="error"/>
+    <logger name="slick.jdbc" level="error" />
     <logger name="slick.ast" level="error" />
     <logger name="slick.memory" level="error" />
     <logger name="slick.relational" level="error" />
     <logger name="slick.compiler" level="error" />
-    <logger name="com.typesafe" level ="info" />
+    <logger name="com.typesafe" level ="error" />
     <logger name="edu.eckerd" level="info" />
-    <logger name="com.zaxxer.hikari" level="info" />
+    <logger name="com.zaxxer.hikari" level="error" />
     <!-- Configure so that it outputs to both console and log file -->
     <root level="DEBUG">
         <appender-ref ref="FILE" />
