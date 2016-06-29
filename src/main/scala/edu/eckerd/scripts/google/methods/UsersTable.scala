@@ -5,6 +5,7 @@ import edu.eckerd.google.api.services.directory.Directory
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 import edu.eckerd.scripts.google.temp.GoogleTables.googleUsers
+import edu.eckerd.scripts.google.temp.GoogleTables.recoverFromTableCreateFail
 import scala.concurrent.{ExecutionContext, Future}
 import edu.eckerd.google.api.services.directory.models.User
 /**
@@ -34,7 +35,7 @@ object UsersTable extends LazyLogging {
     val tableQuery = googleUsers
 
     val action = tableQuery.schema.create
-    db.run(action)
+    db.run(action) recoverWith recoverFromTableCreateFail
   }
 
 

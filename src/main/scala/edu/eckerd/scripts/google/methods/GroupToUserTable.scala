@@ -11,6 +11,7 @@ import edu.eckerd.google.api.services.directory.Directory
 import edu.eckerd.google.api.services.directory.models.Member
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
+import edu.eckerd.scripts.google.temp.GoogleTables.recoverFromTableCreateFail
 
 import concurrent.{ExecutionContext, Future}
 import language.postfixOps
@@ -175,7 +176,7 @@ object GroupToUserTable extends LazyLogging{
     val db = dbConfig.db
 
     val action = googleGroupToUser.schema.create
-    db.run(action)
+    db.run(action) recoverWith recoverFromTableCreateFail
   }
 
   /**

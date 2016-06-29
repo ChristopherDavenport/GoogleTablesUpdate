@@ -9,7 +9,7 @@ import edu.eckerd.scripts.google.temp.GoogleTables.GoogleGroupsRow
 import edu.eckerd.scripts.google.temp.GoogleTables.gwbAlias
 import edu.eckerd.scripts.google.temp.GoogleTables.GwbaliasRow
 import edu.eckerd.google.api.services.directory.models.Group
-
+import edu.eckerd.scripts.google.temp.GoogleTables.recoverFromTableCreateFail
 import concurrent.{ExecutionContext, Future}
 import language.postfixOps
 import language.implicitConversions
@@ -206,7 +206,7 @@ object GroupsTable extends LazyLogging{
     val tableQuery = googleGroups
 
     val action = tableQuery.schema.create
-    db.run(action)
+    db.run(action) recoverWith recoverFromTableCreateFail
   }
 
   /**

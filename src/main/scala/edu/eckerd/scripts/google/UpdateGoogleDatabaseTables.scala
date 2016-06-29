@@ -31,11 +31,11 @@ object UpdateGoogleDatabaseTables extends App with GoogleTables with LazyLogging
   val domains = Seq("eckerd.edu")
 
   val doIt = for {
-//    createUsers <- createGoogleUsersTable
+    createUsers <- createGoogleUsersTable
     usersUpdate <- updateGoogleUsersTable(domains)
-//    createGroups <- createGoogleGroupsTable
+    createGroups <- createGoogleGroupsTable
     groupsUpdate <- UpdateGoogleGroupsTableComplete(domains)
-//    createGroupToUser <- createGoogleGroupToUserTable
+    createGroupToUser <- createGoogleGroupToUserTable
     groupToUserUpdate <- UpdateGoogleGroupToUserTable(domains)
   } yield (usersUpdate, groupsUpdate, groupToUserUpdate)
 

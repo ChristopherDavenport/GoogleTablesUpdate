@@ -1,15 +1,25 @@
 package edu.eckerd.scripts.google.temp
 
-import java.sql.Timestamp
+import java.sql.{SQLSyntaxErrorException, Timestamp}
 
+import com.typesafe.scalalogging.LazyLogging
 import edu.eckerd.google.api.services.directory.models.{Email, Name, User}
+
+import concurrent.Future
 
 /**
   * Created by davenpcm on 6/24/16.
   */
-object GoogleTables extends GoogleTables {
+object GoogleTables extends GoogleTables with LazyLogging{
   val profile = com.typesafe.slick.driver.oracle.OracleDriver
   import profile.api._
+
+  def recoverFromTableCreateFail: PartialFunction[Throwable, Future[Unit]] = {
+    case tableExists : SQLSyntaxErrorException if
+    tableExists.getLocalizedMessage.contains("ORA-00955: name is already used by an existing object") =>
+      logger.warn("Table Already Exists, if this is first run - TableNames may already be in use")
+      Future.successful(())
+  }
 
   private def googleGroupToUserFindByPK(groupID: Rep[String], userID: Rep[String]) = for {
     gtu <- googleGroupToUser if gtu.groupId === groupID && gtu.userID === userID
