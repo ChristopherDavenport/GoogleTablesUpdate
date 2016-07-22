@@ -2,7 +2,6 @@ package edu.eckerd.scripts.google.methods
 
 import java.sql.{SQLIntegrityConstraintViolationException, SQLSyntaxErrorException}
 
-import com.sun.net.httpserver.Authenticator.Success
 import com.typesafe.scalalogging.LazyLogging
 import edu.eckerd.scripts.google.temp.GoogleTables.googleGroupToUser
 import edu.eckerd.scripts.google.temp.GoogleTables.GoogleGroupToUserRow
@@ -12,19 +11,15 @@ import edu.eckerd.google.api.services.directory.models.Member
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 import edu.eckerd.scripts.google.temp.GoogleTables.recoverFromTableCreateFail
-
+import edu.eckerd.google.api.services.directory.models.Group
 import concurrent.{ExecutionContext, Future}
 import language.postfixOps
 import language.implicitConversions
-import scala.util.Try
-import scala.util.control.NonFatal
 
 /**
   * Created by davenpcm on 6/26/16.
   */
 object GroupToUserTable extends LazyLogging{
-
-
 
   /**
     * This updates the Google Group To User Table for a given domain
@@ -34,7 +29,7 @@ object GroupToUserTable extends LazyLogging{
     * @param ec The Execution Context To Split Into For Futures
     * @return A Sequence of Each Row and the Number of Rows Effected, which Should always be 1
     */
-  def UpdateGoogleGroupToUserTable(domains: Seq[String])(
+  def UpdateGoogleGroupToUserTable(domains: List[String])(
     implicit dbConfig: DatabaseConfig[JdbcProfile],
     service: Directory,
     ec: ExecutionContext
@@ -42,42 +37,86 @@ object GroupToUserTable extends LazyLogging{
 
     logger.info("Starting Google Members Update")
 
-    Future.sequence{
-      val perform = for {
-        domain <- domains.par
+    val f = Future.sequence {
+      for {
+        domain <- domains
         group <- service.groups.list(domain)
-        member <- service.members.list(group.email).par
       } yield {
-        val GeneratedRow = GoogleGroupToUserRow(group.id.get, member.id.get, member.email, "N", member.role, member.memberType)
+        val members = groupMembers(group)
         for {
-          rowFromDB <- getMemberFromDB(group.id.get, member.id.get)
-          result <- insertOrUpdateMemberInDB(rowFromDB, GeneratedRow)
-        } yield {
-          logger.debug(s"Row From DB For $member - $rowFromDB")
-          (member, result)
-        }
+          _ <- deleteNonExistentMembers(group, members)
+          result <- Future.sequence {
+            for {
+              member <- members
+            } yield {
+              val GeneratedRow = GoogleGroupToUserRow(
+                group.id.get, member.id.get, member.email, "N", member.role, member.memberType
+              )
+              for {
+                rowFromDB <- getMemberFromDB(group.id.get, member.id.get)
+                result <- insertOrUpdateMemberInDB(rowFromDB, GeneratedRow)
+              } yield {
+                logger.debug(s"Row From DB For $member - $rowFromDB")
+                (member, result)
+              }
+            }
+          }
+        } yield result
       }
-      perform.seq
     }
+
+    f.map(_.flatten)
+
   }
 
+  /**
+    * Get all Members of a Group
+    * @param group The Group
+    * @param service The service to get members from
+    * @return A List of all Members of that Group
+    */
+  def groupMembers(group: Group)(implicit service: Directory): List[Member] =
+    for {member <- service.members.list(group.email)} yield member
+
+  /**
+    * Takes a Group and a List of All Its Members and then checks that against what is currently in the database.
+    * It then deletes any records that are in the database but do not exist in Google.
+    * @param group The group to look for
+    * @param members The members of the group
+    * @param dbConfig The database coinfiguration
+    * @param ec The execution context to pull futures from
+    * @return An Integer Of the Number Of Rows Deleted
+    */
+  def deleteNonExistentMembers(group: Group, members: List[Member])
+                             (implicit dbConfig: DatabaseConfig[JdbcProfile],
+                               ec: ExecutionContext
+                             ): Future[Int] = {
+    import dbConfig.driver.api._
+    val db = dbConfig.db
+
+    val memberIdsOpt = members.map(_.id)
+    val memberIds = memberIdsOpt.map(_.get)
+
+    val q = for {
+      result <- googleGroupToUser
+      if result.groupId === group.id.get && ! result.userID.inSetBind(memberIds)
+    } yield result
+
+    db.run(q.delete)
+  }
+
+  /**
+    * This is the functionality that extends that if it exists it is returned as valid or if it is not it adds the
+    * new member to the database
+    * @param existingRow The row returned
+    * @param generatedRow The row created
+    * @param dbConfig The database configuration
+    * @param ec The execution context
+    * @return An Int corresponding to the rows created should be 0 or 1
+    */
   private def insertOrUpdateMemberInDB(existingRow: Option[GoogleGroupToUserRow], generatedRow: GoogleGroupToUserRow)
                                       (implicit dbConfig: DatabaseConfig[JdbcProfile],
                                        ec: ExecutionContext): Future[Int] = existingRow match {
-//    case Some(row) =>
-//      val updatedRow = GoogleGroupToUserRow(
-//        generatedRow.groupId,
-//        generatedRow.userID,
-//        row.autoIndicator,
-//        generatedRow.memberRole,
-//        generatedRow.memberType,
-//        row.processIndicator
-//      )
-//      if (){
-//        Future.successful(0)
-//      } else {
-//        updateMemberInDB(updatedRow)
-//      }
     case None =>
       addMemberToDB(generatedRow)
     case _ => Future.successful(0)
