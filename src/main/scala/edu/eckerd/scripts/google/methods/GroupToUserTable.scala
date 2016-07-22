@@ -80,7 +80,8 @@ object GroupToUserTable extends LazyLogging{
 
   /**
     * Takes a Group and a List of All Its Members and then checks that against what is currently in the database.
-    * It then deletes any records that are in the database but do not exist in Google.
+    * It then deletes any records that are in the database but do not exist in Google. Fixed Maximum Limit at 5000
+    * members, if we have any groups larger than this oracle will throw an error.
     * @param group The group to look for
     * @param members The members of the group
     * @param dbConfig The database coinfiguration
@@ -96,13 +97,22 @@ object GroupToUserTable extends LazyLogging{
 
     val memberIdsOpt = members.map(_.id)
     val memberIds = memberIdsOpt.map(_.get)
+    val memberIds1 = memberIds.take(1000)
+    val memberIds2 = memberIds.slice(1000, 2000)
+    val memberIds3 = memberIds.slice(2000, 3000)
+    val memberIds4 = memberIds.slice(3000, 4000)
+    val memberIds5 = memberIds.drop(4000)
 
     val q = for {
       result <- googleGroupToUser
-      if result.groupId === group.id.get && ! result.userID.inSetBind(memberIds)
+      if result.groupId === group.id.get && !result.userID.inSetBind(memberIds1) &&
+        !result.userID.inSetBind(memberIds2) && !result.userID.inSetBind(memberIds3) &&
+        !result.userID.inSetBind(memberIds4) && !result.userID.inSetBind(memberIds5)
     } yield result
 
-    db.run(q.delete)
+    val f = db.run(q.delete)
+    f.map{ case i if i > 0 => logger.info(s"${group.name} - Deleted $i members")}
+    f
   }
 
   /**
